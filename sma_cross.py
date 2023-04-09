@@ -140,17 +140,16 @@ def sma_cross_exit_strategy(df:object,symbol:str):
     current_sma = sma_cross_detect(df)[1]
     order_id = get_last_order(trading_symbol)[0]
     current_price = df.close.iloc[-1]
-    side = 'na'
-    if previous_sma == 'up' and current_sma == 'down':
+    side = get_last_order_side(symbol)
+    
+    if side == 'Buy' and current_sma == 'down':
         print('CLOSE LONG')
         close_position(symbol)
-        side = 'Buy'
         insert_log('order_close',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
 
-    elif previous_sma == 'down' and current_sma == 'up':
+    elif side == 'Sell' and current_sma == 'up':
         print('CLOSE SHORT')
         close_position(symbol)
-        side = 'Sell'
         insert_log('order_close',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
 
     else:
@@ -173,6 +172,11 @@ def get_last_order(trading_symbol):
     cur.execute(f'select order_id from Logs where symbol="{trading_symbol}" and log_type != "log" order by id desc')
     order_id = str(cur.fetchone()).replace('(','').replace(')','').replace(',','')
     return order_id
+    
+def get_last_order_side(trading_symbol):
+    cur.execute(f'select buy_sell from Logs where symbol="{trading_symbol}" and log_type != "log" order by id desc')
+    buy_sell = str(cur.fetchone()).replace('(','').replace(')','').replace(',','')
+    return buy_sell
 
 def close_position(trading_symbol):
     session.close_position(symbol=trading_symbol)
