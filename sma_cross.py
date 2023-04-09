@@ -202,6 +202,7 @@ if __name__ == '__main__':
     else:
         sma_cross_exit_strategy(candles,trading_symbol)
 
+    print_Last_log()
     cur.close()
     conn.close()
     conn = sql.connect('bybit_sma')
