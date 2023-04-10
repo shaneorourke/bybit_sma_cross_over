@@ -138,7 +138,7 @@ def sma_cross_entry_strategy(df:object,symbol:str):
 def sma_cross_exit_strategy(df:object,symbol:str):
     previous_sma = sma_cross_detect(df)[0]
     current_sma = sma_cross_detect(df)[1]
-    order_id = get_last_order(trading_symbol)[0]
+    order_id = get_last_order(trading_symbol)
     current_price = df.close.iloc[-1]
     side = get_last_order_side(symbol)
     
@@ -153,7 +153,7 @@ def sma_cross_exit_strategy(df:object,symbol:str):
         insert_log('order_close',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
 
     else:
-        insert_log('log',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,"na")
+        insert_log('log',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
 
 
 def place_order(trading_symbol,order_side,quantity,buy_price):
@@ -170,12 +170,12 @@ def place_order(trading_symbol,order_side,quantity,buy_price):
 
 def get_last_order(trading_symbol):
     cur.execute(f'select order_id from Logs where symbol="{trading_symbol}" and log_type != "log" order by id desc')
-    order_id = str(cur.fetchone()).replace('(','').replace(')','').replace(',','')
+    order_id = str(cur.fetchone()).replace('(','').replace(')','').replace(',','').replace("'","")
     return order_id
     
 def get_last_order_side(trading_symbol):
     cur.execute(f'select buy_sell from Logs where symbol="{trading_symbol}" and log_type != "log" order by id desc')
-    buy_sell = str(cur.fetchone()).replace('(','').replace(')','').replace(',','')
+    buy_sell = str(cur.fetchone()).replace('(','').replace(')','').replace(',','').replace("'","")
     return buy_sell
 
 def close_position(trading_symbol):
