@@ -10,8 +10,9 @@ from pytz import HOUR
 
 conn = sql.connect('bybit_sma')
 cur = conn.cursor()
-cur.execute('CREATE TABLE IF NOT EXISTS Logs (id integer PRIMARY KEY AUTOINCREMENT, log_type text, order_id text, symbol text, close decimal, fast_sma decimal, slow_sma decimal, cross text, last_cross text, buy_sell text, market_date timestamp DEFAULT current_timestamp)')
-cur.execute('INSERT OR REPLACE INTO Logs (id,log_type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,buy_sell) VALUES (1,"log","na",NULL,0,0,0,"wait","na","na")')
+cur.execute('CREATE TABLE IF NOT EXISTS Logs (id integer PRIMARY KEY AUTOINCREMENT, log_type text, order_id text, symbol text, close decimal, fast_sma decimal, slow_sma decimal, cross text, last_cross text, buy_sell text, trend text, market_date timestamp DEFAULT current_timestamp)')
+cur.execute('ALTER TABLE Logs ADD COLUMN trend text')
+cur.execute('INSERT OR REPLACE INTO Logs (id,log_type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,buy_sell,trend) VALUES (1,"log","na",NULL,0,0,0,"wait","na","na","na")')
 conn.commit()
 
 session = HTTP("https://api.bybit.com",
@@ -21,10 +22,14 @@ try:
 except Exception as e:
     error = e
 
-now_today = dt.datetime.now()
-now_timestamp = dt.datetime.now()
-now = now_today + dt.timedelta(days=-3)
-today = dt.datetime(now.year, now.month, now.day)
+def get_now_today():
+    now_today = dt.datetime.now()
+    return now_today
+
+def get_today(lookback):
+    now = get_now_today() + dt.timedelta(days=lookback)
+    today = dt.datetime(now.year, now.month, now.day)
+    return today
 
 def applytechnicals(df):
     df['FastSMA'] = df.close.rolling(7).mean()
@@ -46,15 +51,19 @@ def get_bybit_bars(trading_symbol, interval, startTime, apply_technicals):
         applytechnicals(df)
     return df
 
-def insert_log(trading_symbol,type,order_id,close_price,fast_sma,slow_sma,cross,last_cross,buy_sell):
+def get_trend(trading_symbol):
+    trend = get_bybit_bars(trading_symbol,'D',get_today(-120),True)
+    return sma_cross_detect(trend)[1]
+
+def insert_log(trading_symbol,type,order_id,close_price,fast_sma,slow_sma,cross,last_cross,buy_sell,trend):
     if str(buy_sell).upper() not in ('LONG','SHORT'):
         buy_sell == None
-    insert_query = f'INSERT INTO Logs (log_type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,buy_sell) VALUES ("{trading_symbol}","{type}","{order_id}",{close_price},{fast_sma},{slow_sma},"{cross}","{last_cross}","{buy_sell}")'
+    insert_query = f'INSERT INTO Logs (log_type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,buy_sell,trend) VALUES ("{trading_symbol}","{type}","{order_id}",{close_price},{fast_sma},{slow_sma},"{cross}","{last_cross}","{buy_sell}","{trend}")'
     cur.execute(insert_query)
     conn.commit()
 
 def read_last_log():
-    query = 'SELECT id,log_type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,market_date,buy_sell FROM logs ORDER BY id DESC LIMIT 1 '
+    query = 'SELECT id,log_type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,market_date,buy_sell,trend FROM logs ORDER BY id DESC LIMIT 1 '
     cur.execute(query)
     output = cur.fetchone()
     id = output[0]
@@ -68,21 +77,23 @@ def read_last_log():
     last_cross = output[8]
     market_date = output[9]
     buy_sell = output[10]
-    return id,type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,market_date,buy_sell
+    trend = output[11]
+    return id,type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,market_date,buy_sell,trend
 
 def print_Last_log():
     log = read_last_log()
-    print(f'{now_today}:id:{log[0]}')
-    print(f'{now_today}:type:{log[1]}')
-    print(f'{now_today}:order_id:{log[2]}')
-    print(f'{now_today}:symbol:{log[3]}')
-    print(f'{now_today}:close:{log[4]}')
-    print(f'{now_today}:fast_sma:{log[5]}')
-    print(f'{now_today}:slow_sma:{log[6]}')
-    print(f'{now_today}:cross:{log[7]}')
-    print(f'{now_today}:last_cross:{log[8]}')
-    print(f'{now_today}:market_date:{log[9]}')
-    print(f'{now_today}:buy_sell:{log[10]}')
+    print(f'{get_now_today()}:id:{log[0]}')
+    print(f'{get_now_today()}:type:{log[1]}')
+    print(f'{get_now_today()}:order_id:{log[2]}')
+    print(f'{get_now_today()}:symbol:{log[3]}')
+    print(f'{get_now_today()}:close:{log[4]}')
+    print(f'{get_now_today()}:fast_sma:{log[5]}')
+    print(f'{get_now_today()}:slow_sma:{log[6]}')
+    print(f'{get_now_today()}:cross:{log[7]}')
+    print(f'{get_now_today()}:last_cross:{log[8]}')
+    print(f'{get_now_today()}:market_date:{log[9]}')
+    print(f'{get_now_today()}:buy_sell:{log[10]}')
+    print(f'{get_now_today()}:trend:{log[11]}')
     print()
 
 def get_quantity(close_price):
@@ -119,21 +130,22 @@ def sma_cross_entry_strategy(df:object,symbol:str):
     qty = get_quantity(df.close.iloc[-1])
     current_price = df.close.iloc[-1]
     side = 'na'
+    trend = get_trend(trading_symbol)
 
-    if previous_sma == 'up' and current_sma == 'down':
+    if previous_sma == 'up' and current_sma == 'down' and trend == 'down':
         print('OPEN SHORT')
         side = "Sell"
         order_id = place_order(symbol,side,qty,current_price)
-        insert_log('order_open',order_id,trading_symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
+        insert_log('order_open',order_id,trading_symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side,trend)
 
-    elif previous_sma == 'down' and current_sma == 'up':
+    elif previous_sma == 'down' and current_sma == 'up' and trend == 'up':
         print('OPEN LONG')
         side = "Buy"
         order_id = place_order(symbol,side,qty,current_price)  
-        insert_log('order_open',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
+        insert_log('order_open',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side,trend)
      
     else:
-        insert_log('log','na',symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
+        insert_log('log','na',symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side,trend)
 
 def sma_cross_exit_strategy(df:object,symbol:str):
     previous_sma = sma_cross_detect(df)[0]
@@ -141,20 +153,20 @@ def sma_cross_exit_strategy(df:object,symbol:str):
     order_id = get_last_order(trading_symbol)
     current_price = df.close.iloc[-1]
     side = get_last_order_side(symbol)
+    trend = get_trend(symbol)
     
     if side == 'Buy' and current_sma == 'down':
         print('CLOSE LONG')
         close_position(symbol)
-        insert_log('order_close',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
+        insert_log('order_close',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side,trend)
 
     elif side == 'Sell' and current_sma == 'up':
         print('CLOSE SHORT')
         close_position(symbol)
-        insert_log('order_close',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
+        insert_log('order_close',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side,trend)
 
     else:
-        insert_log('log',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side)
-
+        insert_log('log',order_id,symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side,trend)
 
 def place_order(trading_symbol,order_side,quantity,buy_price):
     order_df = pd.DataFrame(session.place_active_order(symbol=trading_symbol,
@@ -166,7 +178,6 @@ def place_order(trading_symbol,order_side,quantity,buy_price):
                                         reduce_only=False,
                                         close_on_trigger=False)['result'],index=[0])
     return order_df.order_id.iloc[-1]
-
 
 def get_last_order(trading_symbol):
     cur.execute(f'select order_id from Logs where symbol="{trading_symbol}" and log_type != "log" order by id desc')
@@ -190,11 +201,11 @@ def check_open_position():
     open_position = float(str(cur.fetchone()).replace('(','').replace(')','').replace(',',''))
     return open_position
 
+
 if __name__ == '__main__':
     trading_symbol = "SOLUSDT"
     interval='60'
-    trailing_stop_take_profit = True
-    candles = get_bybit_bars(trading_symbol,interval,today,True)
+    candles = get_bybit_bars(trading_symbol,interval,get_today(-3),True)
 
     open_position = check_open_position()
     if not open_position > 0.0:
@@ -207,4 +218,3 @@ if __name__ == '__main__':
     conn.close()
     conn = sql.connect('bybit_sma')
     cur = conn.cursor()
-
