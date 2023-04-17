@@ -3,7 +3,6 @@ from pybit.usdt_perpetual import HTTP
 import bybit_secrets as sc
 import datetime as dt
 import sqlite3 as sql
-from time import sleep
 import ta
 
 from pytz import HOUR
@@ -193,7 +192,7 @@ def place_order(trading_symbol,order_side,quantity,buy_price,take_profit):
                                         time_in_force="ImmediateOrCancel",
                                         reduce_only=False,
                                         close_on_trigger=False,
-                                        take_profit=take_profit)['result'],index=[0])
+                                        take_profit=round(take_profit,3))['result'],index=[0])
     return order_df.order_id.iloc[-1]
 
 def get_last_order(trading_symbol):
