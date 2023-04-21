@@ -10,8 +10,8 @@ from pytz import HOUR
 conn = sql.connect('bybit_sma')
 cur = conn.cursor()
 cur.execute('CREATE TABLE IF NOT EXISTS Logs (id integer PRIMARY KEY AUTOINCREMENT, log_type text, order_id text, symbol text, close decimal, fast_sma decimal, slow_sma decimal, cross text, last_cross text, buy_sell text, trend text, take_profit decimal, volume decimal, volumeMA decimal, market_date timestamp DEFAULT current_timestamp)')
-cur.execute('ALTER TABLE Logs ADD COLUMN volume decimal')
-cur.execute('ALTER TABLE Logs ADD COLUMN volumeMA decimal')
+#cur.execute('ALTER TABLE Logs ADD COLUMN volume decimal')
+#cur.execute('ALTER TABLE Logs ADD COLUMN volumeMA decimal')
 cur.execute('INSERT OR REPLACE INTO Logs (id,log_type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,buy_sell,trend,take_profit,volume,volumeMA) VALUES (1,"log","na",NULL,0,0,0,"wait","na","na","na",0,0,0)')
 conn.commit()
 
