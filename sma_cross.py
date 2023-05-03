@@ -259,7 +259,7 @@ if __name__ == '__main__':
     if not open_position > 0.0:
         sma_cross_entry_strategy(candles,trading_symbol,0.025)
     else:
-        sma_cross_exit_strategy(candles,trading_symbol,True)
+        sma_cross_exit_strategy(candles,trading_symbol,False)
 
     print_Last_log()
     cur.close()
