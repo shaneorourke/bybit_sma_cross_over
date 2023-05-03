@@ -10,8 +10,6 @@ from pytz import HOUR
 conn = sql.connect('bybit_sma')
 cur = conn.cursor()
 cur.execute('CREATE TABLE IF NOT EXISTS Logs (id integer PRIMARY KEY AUTOINCREMENT, log_type text, order_id text, symbol text, close decimal, fast_sma decimal, slow_sma decimal, cross text, last_cross text, buy_sell text, trend text, take_profit decimal, volume decimal, volumeMA decimal, market_date timestamp DEFAULT current_timestamp)')
-#cur.execute('ALTER TABLE Logs ADD COLUMN volume decimal')
-#cur.execute('ALTER TABLE Logs ADD COLUMN volumeMA decimal')
 cur.execute('INSERT OR REPLACE INTO Logs (id,log_type,order_id,symbol,close,fast_sma,slow_sma,cross,last_cross,buy_sell,trend,take_profit,volume,volumeMA) VALUES (1,"log","na",NULL,0,0,0,"wait","na","na","na",0,0,0)')
 conn.commit()
 
@@ -158,7 +156,7 @@ def sma_cross_entry_strategy(df:object,symbol:str,tp_percentage:float):
     else:
         insert_log('log','na',symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side,trend,0,current_volume,current_VolumeMA)
 
-def sma_cross_exit_strategy(df:object,symbol:str):
+def sma_cross_exit_strategy(df:object,symbol:str,tp_override:bool):
     previous_sma = sma_cross_detect(df)[0]
     current_sma = sma_cross_detect(df)[1]
     order_id = get_last_order_id(trading_symbol)
@@ -168,6 +166,8 @@ def sma_cross_exit_strategy(df:object,symbol:str):
     side = get_last_order_side(symbol)
     trend = get_trend(symbol)
     take_profit = get_last_order_take_profit(symbol)
+    if tp_override:
+        tp_override(trading_symbol,0.025)
     
     if side == 'Buy' and ((current_price >= take_profit) or (current_sma == 'down')):
         close_reason = ''
@@ -221,6 +221,22 @@ def get_last_order_take_profit(trading_symbol):
         take_profit = float(take_profit)
     return take_profit
 
+def get_last_order_buy_price(trading_symbol):
+    cur.execute(f'select close from Logs where symbol="{trading_symbol}" and log_type != "log" order by id desc')
+    close = str(cur.fetchone()).replace('(','').replace(')','').replace(',','').replace("'","")
+    if close != 'None':
+        close = float(close)
+    return close
+
+def tp_override(trading_symbol:str,override_percentage:float):
+    buy_price = get_last_order_buy_price(trading_symbol)
+    side = get_last_order_side(trading_symbol)
+    if side == 'Sell':
+        tp = buy_price-(buy_price*override_percentage)
+    else:
+        tp = buy_price+(buy_price*override_percentage)
+    return tp
+
 def close_position(trading_symbol):
     session.close_position(symbol=trading_symbol)
     conn.commit()
@@ -243,7 +259,7 @@ if __name__ == '__main__':
     if not open_position > 0.0:
         sma_cross_entry_strategy(candles,trading_symbol,0.025)
     else:
-        sma_cross_exit_strategy(candles,trading_symbol)
+        sma_cross_exit_strategy(candles,trading_symbol,True)
 
     print_Last_log()
     cur.close()
