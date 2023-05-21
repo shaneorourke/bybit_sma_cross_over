@@ -139,14 +139,14 @@ def sma_cross_entry_strategy(df:object,symbol:str,tp_percentage:float):
     side = 'na'
     trend = get_trend(trading_symbol)
 
-    if previous_sma == 'up' and current_sma == 'down' and trend == 'down' and current_volume >= current_volumeMA:
+    if previous_sma == 'up' and current_sma == 'down' and trend == 'down' and current_volume >= current_VolumeMA:
         print('OPEN SHORT')
         side = "Sell"
         take_profit = float(current_price) - (float(current_price) * float(tp_percentage))
         order_id = place_order(symbol,side,qty,current_price,take_profit)
         insert_log('order_open',order_id,trading_symbol,current_price,df.FastSMA.iloc[-1],df.SlowSMA.iloc[-1],current_sma,previous_sma,side,trend,take_profit,current_volume,current_VolumeMA)
 
-    elif previous_sma == 'down' and current_sma == 'up' and trend == 'up' and current_volume >= current_volumeMA:
+    elif previous_sma == 'down' and current_sma == 'up' and trend == 'up' and current_volume >= current_VolumeMA:
         print('OPEN LONG')
         side = "Buy"
         take_profit = float(current_price) + (float(current_price) * float(tp_percentage))
