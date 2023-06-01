@@ -257,7 +257,7 @@ if __name__ == '__main__':
 
     open_position = check_open_position()
     if not open_position > 0.0:
-        sma_cross_entry_strategy(candles,trading_symbol,0.025)
+        sma_cross_entry_strategy(candles,trading_symbol,0.02)
     else:
         sma_cross_exit_strategy(candles,trading_symbol,False)
 
