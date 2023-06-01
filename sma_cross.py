@@ -167,7 +167,7 @@ def sma_cross_exit_strategy(df:object,symbol:str,tp_override:bool):
     trend = get_trend(symbol)
     take_profit = get_last_order_take_profit(symbol)
     if tp_override:
-        take_profit = get_tp_override(trading_symbol,0.025)
+        take_profit = get_tp_override(trading_symbol,0.02)
     
     if side == 'Buy' and ((current_price >= take_profit) or (current_sma == 'down')):
         close_reason = ''
